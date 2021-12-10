@@ -2,7 +2,7 @@
   "name": "find-missing-keys",
   "displayName": "Find Missing Keys",
   "description": "Find missing keys between json files",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "repository": {
     "url": "https://github.com/Berkaylar/Find-Missing-Keys"
   },
