@@ -2,7 +2,11 @@
   "name": "find-missing-keys",
   "displayName": "Find Missing Keys",
   "description": "Find missing keys between json files",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "repository": {
+    "url": "https://github.com/Berkaylar/Find-Missing-Keys"
+  },
+  "publisher": "berkayyildiz",
   "engines": {
     "vscode": "^1.63.0"
   },
@@ -19,7 +23,28 @@
         "command": "find-missing-keys.findMissingKeys",
         "title": "Find Missing Keys"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Find Missing Keys",
+      "properties": {
+        "find-missing-keys.isEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable the highlight"
+        },
+        "find-missing-keys.referenceFilePath": {
+          "type": "string",
+          "default": "/src/assets/i18n/en.json",
+          "description": "Reference file path"
+        },
+        "find-missing-keys.compareFilePath": {
+          "type": "string",
+          "default": "/src/assets/i18n/tr.json",
+          "description": "Compare file path"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

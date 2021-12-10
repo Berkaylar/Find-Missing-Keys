@@ -1,19 +1,67 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 const fs = require("fs");
+const window = vscode.window;
+const workspace = vscode.workspace;
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  var window = vscode.window;
-  var activeEditor = window.activeTextEditor;
+  let timeout: any = null;
+  let activeEditor = window.activeTextEditor;
   let missingKeys: string[] = [];
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log(
-    'Congratulations, your extension "find-missing-keys" is now active!'
+  let referenceFilePath = "";
+  let compareFilePath = "";
+
+  let settings = workspace.getConfiguration("find-missing-keys");
+
+  init();
+
+  if (activeEditor) {
+    console.log("first init");
+    triggerUpdateDecorations();
+  }
+
+  window.onDidChangeActiveTextEditor(
+    function (editor) {
+      activeEditor = editor;
+      if (editor) {
+        console.log("active editor changed");
+        triggerUpdateDecorations();
+      }
+    },
+    null,
+    context.subscriptions
   );
+
+  workspace.onDidChangeTextDocument(
+    function (event) {
+      if (activeEditor && event.document === activeEditor.document) {
+        console.log("document updated");
+
+        triggerUpdateDecorations();
+      }
+    },
+    null,
+    context.subscriptions
+  );
+
+  workspace.onDidChangeConfiguration(
+    () => {
+      settings = workspace.getConfiguration("find-missing-keys");
+
+      //NOTE: if disabled, do not re-initialize the data or we will not be able to clear the style immediatly via 'toggle highlight' command
+      if (!settings.get("isEnabled")) return;
+
+      init(); //no need
+      console.log("configuration changed");
+      triggerUpdateDecorations();
+    },
+    null,
+    context.subscriptions
+  );
+
+  function init() {
+    referenceFilePath = settings.get("referenceFilePath") || "";
+    compareFilePath = settings.get("compareFilePath") || "";
+  }
 
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
@@ -21,40 +69,40 @@ export function activate(context: vscode.ExtensionContext) {
   let disposable = vscode.commands.registerCommand(
     "find-missing-keys.findMissingKeys",
     () => {
-      // The code you place here will be executed every time your command is executed
-      // Display a message box to the user
-      const getKeys = (obj: Object) => {
-        const keys: string[] = [];
+      vscode.window.showInformationMessage("Find Missing Keys init done");
+    }
+  );
 
-        const walk = (o: Object, parent?: Object) => {
-          for (const k in o) {
-            const current = parent ? parent + "." + k : k;
-            keys.push(current);
+  const getKeys = (obj: Object) => {
+    const keys: string[] = [];
 
-            // This checks if the current value is an Object
-            if (
-              Object.prototype.toString.call((o as any)[k]) ===
-              "[object Object]"
-            ) {
-              walk((o as any)[k], current);
-            }
-          }
-        };
+    const walk = (o: Object, parent?: Object) => {
+      for (const k in o) {
+        const current = parent ? parent + "." + k : k;
+        keys.push(current);
 
-        walk(obj);
+        // This checks if the current value is an Object
+        if (
+          Object.prototype.toString.call((o as any)[k]) === "[object Object]"
+        ) {
+          walk((o as any)[k], current);
+        }
+      }
+    };
 
-        return keys;
-      };
+    walk(obj);
 
-      const getKeysFromFile = (langKey: string, workspacePath: string) => {
-        const rawData = fs.readFileSync(
-          workspacePath + `/src/assets/i18n/${langKey}.json`
-        );
-        const refObject: Object = JSON.parse(rawData);
-        return getKeys(refObject);
-      };
+    return keys;
+  };
 
-      /* 
+  const getKeysFromFile = (path: string, workspacePath: string) => {
+    const rawData = fs.readFileSync(workspacePath + path);
+    const refObject: Object = JSON.parse(rawData);
+    return getKeys(refObject);
+  };
+
+  const updateKeys = () => {
+    /* 
       TODO Bug
       When there is two child keys, it marks on the first parent
       event when actually second is missing
@@ -66,39 +114,44 @@ export function activate(context: vscode.ExtensionContext) {
       }
       */
 
-      const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspaceFolders = vscode.workspace.workspaceFolders;
 
-      if (workspaceFolders) {
-        let workspacePath = workspaceFolders[0].uri.path;
+    if (workspaceFolders && referenceFilePath != "" && compareFilePath != "") {
+      let workspacePath = workspaceFolders[0].uri.path;
 
-        const ref = "en";
-        const comp = "tr";
+      const refKeys = getKeysFromFile(referenceFilePath, workspacePath);
+      const compKeys = getKeysFromFile(compareFilePath, workspacePath);
 
-        const refKeys = getKeysFromFile(ref, workspacePath);
-        const compKeys = getKeysFromFile(comp, workspacePath);
-
-        missingKeys = [];
-        refKeys.forEach((refKey) => {
-          if (!compKeys.find((key) => key == refKey)) {
-            missingKeys.push(refKey);
-          }
-        });
-
-        updateDecorations();
-
-        vscode.window.showInformationMessage(
-          "New Command from Find Missing Keys!"
-        );
-      }
+      missingKeys = [];
+      refKeys.forEach((refKey) => {
+        if (!compKeys.find((key) => key == refKey)) {
+          missingKeys.push(refKey);
+        }
+      });
     }
-  );
+  };
 
-  const updateDecorations = () => {
-    if (!activeEditor || !activeEditor.document) {
+  function updateDecorations() {
+    if (
+      !(
+        referenceFilePath != "" &&
+        activeEditor?.document?.uri.path.includes(referenceFilePath)
+      ) &&
+      !(
+        compareFilePath != "" &&
+        activeEditor?.document?.uri.path.includes(compareFilePath)
+      )
+    ) {
       return;
     }
+    const editor = vscode.window.visibleTextEditors.find((editor) =>
+      editor.document.uri.path.includes(referenceFilePath)
+    );
+    if (!editor) return;
 
-    const text = activeEditor.document.getText();
+    updateKeys();
+
+    const text = editor.document.getText();
     const ranges: vscode.Range[] = [];
 
     missingKeys.forEach((longKey) => {
@@ -109,9 +162,9 @@ export function activate(context: vscode.ExtensionContext) {
         if (index + 1 == tree.length) {
           const pattern = RegExp(`"${key}"`, "g");
           const match = pattern.exec(capturingGroup);
-          if (match && activeEditor) {
-            const startPos = activeEditor.document.positionAt(match.index);
-            const endPos = activeEditor.document.positionAt(
+          if (match && editor) {
+            const startPos = editor.document.positionAt(match.index);
+            const endPos = editor.document.positionAt(
               match.index + match[0].length
             );
 
@@ -128,11 +181,16 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const decorationType = window.createTextEditorDecorationType({
-      backgroundColor: "red",
+      backgroundColor: new vscode.ThemeColor("inputValidation.errorBackground"),
     });
 
-    activeEditor?.setDecorations(decorationType, ranges);
-  };
+    editor?.setDecorations(decorationType, ranges);
+  }
+
+  function triggerUpdateDecorations() {
+    timeout && clearTimeout(timeout);
+    timeout = setTimeout(updateDecorations, 0);
+  }
 
   context.subscriptions.push(disposable);
 }
