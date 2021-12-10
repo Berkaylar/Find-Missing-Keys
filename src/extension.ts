@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 const fs = require("fs");
+const execWithIndices = require("regexp-match-indices");
 const window = vscode.window;
 const workspace = vscode.workspace;
 
@@ -112,18 +113,6 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   const updateKeys = () => {
-    /* 
-      TODO Bug
-      When there is two child keys, it marks on the first parent
-      event when actually second is missing
-      "a": {
-        "c": "asd" //marked
-      },
-      "b": {
-        "c": "fgh" //real missing
-      }
-      */
-
     const workspaceFolders = vscode.workspace.workspaceFolders;
 
     if (workspaceFolders && referenceFilePath != "" && compareFilePath != "") {
@@ -167,27 +156,26 @@ export function activate(context: vscode.ExtensionContext) {
     missingKeys.forEach((fullKey) => {
       const tree = fullKey.split(".");
 
-      tree.forEach((key, index) => {
-        let capturingGroup: string = text + "";
-        if (index + 1 == tree.length) {
-          const pattern = RegExp(`"${key}"`, "g");
-          const match = pattern.exec(capturingGroup);
-          if (match && editor) {
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(
-              match.index + match[0].length
-            );
+      let regex = "";
 
-            ranges.push(new vscode.Range(startPos, endPos));
-          }
+      tree.forEach((key, index) => {
+        if (index + 1 == tree.length) {
+          regex += `"(${key})"`;
         } else {
-          const pattern = RegExp(`"${key}": {([\s\S]*?)}`, "g");
-          const match = pattern.exec(capturingGroup);
-          if (match) {
-            capturingGroup = match[0];
-          }
+          regex += `"${key}":[\\s\\S]*?{[\\s\\S]*?`;
         }
       });
+
+      const pattern = RegExp(regex, "g");
+      const match = execWithIndices(pattern, text);
+      const capturingGroupPosition = match.indices[1];
+
+      if (match && editor) {
+        const startPos = editor.document.positionAt(capturingGroupPosition[0]);
+        const endPos = editor.document.positionAt(capturingGroupPosition[1]);
+
+        ranges.push(new vscode.Range(startPos, endPos));
+      }
     });
 
     editor?.setDecorations(
