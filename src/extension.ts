@@ -11,14 +11,18 @@ export function activate(context: vscode.ExtensionContext) {
   let referenceFilePath = "";
   let compareFilePath = "";
 
+  /* 
+  Decoration settings
+  backgroundColor got from ThemeColor to adapt existing theme
+  This should be constant to be able to remove highlight with [] ranges array
+  */
   const decorationType = window.createTextEditorDecorationType({
     backgroundColor: new vscode.ThemeColor("inputValidation.errorBackground"),
   });
 
   let settings = workspace.getConfiguration("find-missing-keys");
 
-  init();
-
+  /* Register toggle highlight command */
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "find-missing-keys.toggleHighlight",
@@ -32,10 +36,14 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  /* Init with settings and start if an active editor exist */
+  init();
+
   if (activeEditor) {
     triggerUpdateDecorations();
   }
 
+  /* Trigger when active editor change */
   window.onDidChangeActiveTextEditor(
     function (editor) {
       activeEditor = editor;
@@ -47,6 +55,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
+  /* Trigger when active document change */
   workspace.onDidChangeTextDocument(
     function (event) {
       if (activeEditor && event.document === activeEditor.document) {
@@ -57,11 +66,11 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
+  /* Trigger when extension configuration change */
   workspace.onDidChangeConfiguration(
     () => {
       settings = workspace.getConfiguration("find-missing-keys");
 
-      //NOTE: if disabled, do not re-initialize the data or we will not be able to clear the style immediatly via 'toggle highlight' command
       if (!settings.get("isEnabled")) return;
 
       init();
@@ -71,11 +80,36 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
+  /* Get reference file paths */
   function init() {
+    // Future config options can placed here
     referenceFilePath = settings.get("referenceFilePath") || "";
     compareFilePath = settings.get("compareFilePath") || "";
   }
 
+  /* 
+  This function create dot merged key array from a nested object
+  making really easy to find missing keys by comparing two arrays
+  
+  Example
+  const input = {
+    "bear": {
+      "polar": "white",
+      "regular": "brown"
+    },
+    "bird": {
+      "no-fly": "brown"
+    },
+    "human": "mixed"
+  }
+
+  output = [
+    "bear.polar",
+    "bear.regular",
+    "bird.no-fly",
+    "human"
+  ]
+  */
   const getKeys = (refObj: Object) => {
     const keys: string[] = [];
 
@@ -98,6 +132,11 @@ export function activate(context: vscode.ExtensionContext) {
     return keys;
   };
 
+  /* 
+  This method gets file and gives it to getKeys method
+  If file is visible it gets document from there to get unsaved changes
+  else it gets with regular file system method
+  */
   const getKeysFromFile = (path: string, workspacePath: string) => {
     let rawData: any;
     const editor = vscode.window.visibleTextEditors.find((editor) =>
@@ -112,6 +151,10 @@ export function activate(context: vscode.ExtensionContext) {
     return getKeys(refObject);
   };
 
+  /* 
+  This method get array of merged keys and just compare to find missing ones
+  Saves for decoration update
+  */
   const updateKeys = () => {
     const workspaceFolders = vscode.workspace.workspaceFolders;
 
@@ -130,7 +173,11 @@ export function activate(context: vscode.ExtensionContext) {
     }
   };
 
+  /* 
+  This method updates decoration to highlight missing keys
+  */
   function updateDecorations() {
+    // If reference or compare file not active not runs it
     if (
       !(
         referenceFilePath != "" &&
@@ -143,21 +190,30 @@ export function activate(context: vscode.ExtensionContext) {
     ) {
       return;
     }
+
+    // Gets reference editor to highlight, if it is not visible it not continue
     const editor = vscode.window.visibleTextEditors.find((editor) =>
       editor.document.uri.path.includes(referenceFilePath)
     );
     if (!editor) return;
 
+    // Updates keys
     updateKeys();
 
+    // Gets reference documents text and create array to put highlighted ranges
     const text = editor.document.getText();
     const ranges: vscode.Range[] = [];
 
+    // Finds each keys position and puts to ranges array
     missingKeys.forEach((fullKey) => {
+      // It split back keys to create regex
       const tree = fullKey.split(".");
-
       let regex = "";
 
+      /* 
+     It creates a regex to find key position
+     It finds the key as first capturing group of match
+     */
       tree.forEach((key, index) => {
         if (index + 1 == tree.length) {
           regex += `"(${key})"`;
@@ -167,9 +223,14 @@ export function activate(context: vscode.ExtensionContext) {
       });
 
       const pattern = RegExp(regex, "g");
+      /* 
+      Finding index of capturing groups is not currently
+      implemented to js, so it uses a polyfill library
+      */
       const match = execWithIndices(pattern, text);
       const capturingGroupPosition = match.indices[1];
 
+      // Adding range to ranges array
       if (match && editor) {
         const startPos = editor.document.positionAt(capturingGroupPosition[0]);
         const endPos = editor.document.positionAt(capturingGroupPosition[1]);
@@ -178,17 +239,23 @@ export function activate(context: vscode.ExtensionContext) {
       }
     });
 
+    // If is enabled it highlights else it removes it
     editor?.setDecorations(
       decorationType,
       settings.get("isEnabled") ? ranges : []
     );
   }
 
+  /* 
+  Triggers update of decorations
+  Actually update logic copied from another library
+  setTimeout this may not be needed but kept anyway
+   */
   function triggerUpdateDecorations() {
     timeout && clearTimeout(timeout);
     timeout = setTimeout(updateDecorations, 0);
   }
 }
 
-// this method is called when your extension is deactivated
+/* Deactivate function if needed */
 export function deactivate() {}
