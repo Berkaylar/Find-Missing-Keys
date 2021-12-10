@@ -14,14 +14,15 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:find-missing-keys.findMissingKeys"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "find-missing-keys.findMissingKeys",
-        "title": "Find Missing Keys"
+        "title": "Toggle highlight",
+        "category": "Find Missing Keys",
+        "command": "find-missing-keys.toggleHighlight"
       }
     ],
     "configuration": {

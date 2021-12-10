@@ -10,12 +10,28 @@ export function activate(context: vscode.ExtensionContext) {
   let referenceFilePath = "";
   let compareFilePath = "";
 
+  const decorationType = window.createTextEditorDecorationType({
+    backgroundColor: new vscode.ThemeColor("inputValidation.errorBackground"),
+  });
+
   let settings = workspace.getConfiguration("find-missing-keys");
 
   init();
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "find-missing-keys.toggleHighlight",
+      function () {
+        settings
+          .update("isEnable", !settings.get("isEnable"), true)
+          .then(function () {
+            triggerUpdateDecorations();
+          });
+      }
+    )
+  );
+
   if (activeEditor) {
-    console.log("first init");
     triggerUpdateDecorations();
   }
 
@@ -23,7 +39,6 @@ export function activate(context: vscode.ExtensionContext) {
     function (editor) {
       activeEditor = editor;
       if (editor) {
-        console.log("active editor changed");
         triggerUpdateDecorations();
       }
     },
@@ -34,8 +49,6 @@ export function activate(context: vscode.ExtensionContext) {
   workspace.onDidChangeTextDocument(
     function (event) {
       if (activeEditor && event.document === activeEditor.document) {
-        console.log("document updated");
-
         triggerUpdateDecorations();
       }
     },
@@ -48,10 +61,9 @@ export function activate(context: vscode.ExtensionContext) {
       settings = workspace.getConfiguration("find-missing-keys");
 
       //NOTE: if disabled, do not re-initialize the data or we will not be able to clear the style immediatly via 'toggle highlight' command
-      if (!settings.get("isEnabled")) return;
+      // if (!settings.get("isEnabled")) return;
 
-      init(); //no need
-      console.log("configuration changed");
+      init();
       triggerUpdateDecorations();
     },
     null,
@@ -62,16 +74,6 @@ export function activate(context: vscode.ExtensionContext) {
     referenceFilePath = settings.get("referenceFilePath") || "";
     compareFilePath = settings.get("compareFilePath") || "";
   }
-
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with registerCommand
-  // The commandId parameter must match the command field in package.json
-  let disposable = vscode.commands.registerCommand(
-    "find-missing-keys.findMissingKeys",
-    () => {
-      vscode.window.showInformationMessage("Find Missing Keys init done");
-    }
-  );
 
   const getKeys = (obj: Object) => {
     const keys: string[] = [];
@@ -96,7 +98,15 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   const getKeysFromFile = (path: string, workspacePath: string) => {
-    const rawData = fs.readFileSync(workspacePath + path);
+    let rawData: any;
+    const editor = vscode.window.visibleTextEditors.find((editor) =>
+      editor.document.uri.path.includes(path)
+    );
+    if (editor) {
+      rawData = editor.document.getText();
+    } else {
+      rawData = fs.readFileSync(workspacePath + path);
+    }
     const refObject: Object = JSON.parse(rawData);
     return getKeys(refObject);
   };
@@ -180,19 +190,16 @@ export function activate(context: vscode.ExtensionContext) {
       });
     });
 
-    const decorationType = window.createTextEditorDecorationType({
-      backgroundColor: new vscode.ThemeColor("inputValidation.errorBackground"),
-    });
-
-    editor?.setDecorations(decorationType, ranges);
+    editor?.setDecorations(
+      decorationType,
+      settings.get("isEnabled") ? ranges : []
+    );
   }
 
   function triggerUpdateDecorations() {
     timeout && clearTimeout(timeout);
     timeout = setTimeout(updateDecorations, 0);
   }
-
-  context.subscriptions.push(disposable);
 }
 
 // this method is called when your extension is deactivated
