@@ -61,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
       settings = workspace.getConfiguration("find-missing-keys");
 
       //NOTE: if disabled, do not re-initialize the data or we will not be able to clear the style immediatly via 'toggle highlight' command
-      // if (!settings.get("isEnabled")) return;
+      if (!settings.get("isEnabled")) return;
 
       init();
       triggerUpdateDecorations();
@@ -75,24 +75,24 @@ export function activate(context: vscode.ExtensionContext) {
     compareFilePath = settings.get("compareFilePath") || "";
   }
 
-  const getKeys = (obj: Object) => {
+  const getKeys = (refObj: Object) => {
     const keys: string[] = [];
 
-    const walk = (o: Object, parent?: Object) => {
-      for (const k in o) {
+    const walk = (obj: Object, parent?: Object) => {
+      for (const k in obj) {
         const current = parent ? parent + "." + k : k;
         keys.push(current);
 
         // This checks if the current value is an Object
         if (
-          Object.prototype.toString.call((o as any)[k]) === "[object Object]"
+          Object.prototype.toString.call((obj as any)[k]) === "[object Object]"
         ) {
-          walk((o as any)[k], current);
+          walk((obj as any)[k], current);
         }
       }
     };
 
-    walk(obj);
+    walk(refObj);
 
     return keys;
   };
@@ -164,8 +164,8 @@ export function activate(context: vscode.ExtensionContext) {
     const text = editor.document.getText();
     const ranges: vscode.Range[] = [];
 
-    missingKeys.forEach((longKey) => {
-      const tree = longKey.split(".");
+    missingKeys.forEach((fullKey) => {
+      const tree = fullKey.split(".");
 
       tree.forEach((key, index) => {
         let capturingGroup: string = text + "";
