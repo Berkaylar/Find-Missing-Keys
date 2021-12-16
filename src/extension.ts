@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 const fs = require("fs");
+var pathNode = require("path");
 // const yaml = require("js-yaml");
 const execWithIndices = require("regexp-match-indices");
 const window = vscode.window;
@@ -183,7 +184,9 @@ export function activate(context: vscode.ExtensionContext) {
     const editor = vscode.window.visibleTextEditors.find((editor) =>
       editor.document.uri.path.includes(path)
     );
-    const fullPath = usePathRelativeToWorkspace ? workspacePath + path : path;
+    const fullPath = usePathRelativeToWorkspace
+      ? pathNode.join(workspacePath, path)
+      : path;
     if (editor) {
       rawData = editor.document.getText();
     } else {
@@ -293,8 +296,8 @@ export function activate(context: vscode.ExtensionContext) {
       });
       matchingFiles.forEach((file) => {
         updateDecorationsForFile(
-          referencePath + "/" + file,
-          comparePath + "/" + file
+          pathNode.join(referencePath, file),
+          pathNode.join(comparePath, file)
         );
       });
     }

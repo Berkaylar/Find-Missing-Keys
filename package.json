@@ -76,12 +76,12 @@
         },
         "find-missing-keys.referencePath": {
           "type": "string",
-          "default": "/src/assets/i18n/en.json",
+          "default": "src/assets/i18n/en.json",
           "description": "Reference file or folder path, if relative to workspace put / to beginning."
         },
         "find-missing-keys.comparePath": {
           "type": "string",
-          "default": "/src/assets/i18n/tr.json",
+          "default": "src/assets/i18n/tr.json",
           "description": "Compare file or folder path, if relative to workspace put / to beginning."
         }
       }
