@@ -1,8 +1,8 @@
 {
   "name": "find-missing-keys",
   "displayName": "Find Missing Keys",
-  "description": "Find missing keys between json files",
-  "version": "0.1.1",
+  "description": "Find missing keys between yaml and json files",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/Berkaylar/Find-Missing-Keys"
   },
