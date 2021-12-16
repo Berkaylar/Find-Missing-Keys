@@ -32,19 +32,19 @@ Uncheck use workspace relative path, give full path.
 
 This is file or folder that has all of wanted keys to compare. After compare this file or files in this folder will be marked for missing translations.
 
-Default: src/assets/i18n/en.json\
+Default: src/assets/i18n/en.json
 
 ## Compare Path
 
 This is file or folder to compare with reference keys. File or files in this folder are not marked, changes will effect marking on the reference file/folder.
 
-Default: src/assets/i18n/en.json\
+Default: src/assets/i18n/en.json
 
 ## Compare Mode
 
-Depending situation handling of files change, there is compare mode option for this.\
+Depending situation handling of files change, there is compare mode option for this.
 
-Default: two-files\
+Default: two-files
 
 ### two-files
 
@@ -56,31 +56,32 @@ It collects all files on given folders, match same named files and compare their
 
 ## Is Enabled
 
-There is a setting option to enable/disable highlighting. You can set it from settings "Is Enabled". Or you can use "Find Missing Keys: Toggle highlight" command.\
+There is a setting option to enable/disable highlighting. You can set it from settings "Is Enabled". Or you can use "Find Missing Keys: Toggle highlight" command.
 
-Default: true\
+Default: true
 
 ## Use Path Relative To Workspace
 
-For paths as default you give it relative to workspace folder but when you want to compare between workspaces you can make this option false and give full file path.\
+For paths as default you give it relative to workspace folder but when you want to compare between workspaces you can make this option false and give full file path.
 
-Default: true\
+Default: true
 
 ## File Type
 
 JSON and YAML is supported. JSON support is straight forward it checks all keys in json file.\
 For YAML files structure can vary, so there is YAML Format option to parse it for wanted structure, if you choose YAML choose a format for parse too.
 
-Default: json\
+Default: json
 
 ## YAML Format
 
-YAML files structure can vary, so there is option to parse.\
+YAML files structure can vary, so there is option to parse.
+
 Default: get-values-of-special-key
 
 ### get-values-of-special-key
 
-This option gets a special key and gets values of that key as translation keys.\
+This option gets a special key and gets values of that key as translation keys.
 
 #### Example:
 
@@ -95,4 +96,4 @@ When special key is "key", it gets "resources.first_steps" as translation key.
 
 The special key for "get-values-of-special-key" yaml format.
 
-Default: key\
+Default: key
