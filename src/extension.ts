@@ -1,15 +1,25 @@
 import * as vscode from "vscode";
 const fs = require("fs");
+const yaml = require("js-yaml");
 const execWithIndices = require("regexp-match-indices");
 const window = vscode.window;
 const workspace = vscode.workspace;
+
+type FileType = "json" | "yaml";
+type YamlFormat = "get-values-of-special-key";
 
 export function activate(context: vscode.ExtensionContext) {
   let timeout: any = null;
   let activeEditor = window.activeTextEditor;
   let missingKeys: string[] = [];
+
+  // Inputs
   let referenceFilePath = "";
   let compareFilePath = "";
+  let fileType: FileType = "json";
+  let usePathRelativeToWorkspace = true;
+  let yamlFormat: YamlFormat = "get-values-of-special-key";
+  let yamlSpecialKey: string = "key";
 
   /* 
   Decoration settings
@@ -21,6 +31,18 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   let settings = workspace.getConfiguration("find-missing-keys");
+
+  /* Get reference file paths */
+  function init() {
+    // Future config options can placed here
+    referenceFilePath = settings.get("referenceFilePath") || "";
+    compareFilePath = settings.get("compareFilePath") || "";
+    fileType = <FileType>settings.get("fileType");
+    usePathRelativeToWorkspace =
+      settings.get("usePathRelativeToWorkspace") || usePathRelativeToWorkspace;
+    yamlFormat = settings.get("yamlFormat") || yamlFormat;
+    yamlSpecialKey = settings.get("yamlSpecialKey") || yamlSpecialKey;
+  }
 
   /* Register toggle highlight command */
   context.subscriptions.push(
@@ -80,13 +102,6 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
-  /* Get reference file paths */
-  function init() {
-    // Future config options can placed here
-    referenceFilePath = settings.get("referenceFilePath") || "";
-    compareFilePath = settings.get("compareFilePath") || "";
-  }
-
   /* 
   This function create dot merged key array from a nested object
   making really easy to find missing keys by comparing two arrays
@@ -132,6 +147,29 @@ export function activate(context: vscode.ExtensionContext) {
     return keys;
   };
 
+  const convertYamlDataToKeys = (rawData: string, yamlFormat: YamlFormat) => {
+    if (yamlFormat == "get-values-of-special-key") {
+      /* 
+      For this format we parse text with regex
+      */
+      let regex = `${yamlSpecialKey}: (.*)`;
+      const pattern = RegExp(regex, "g");
+      const matches = [...rawData.matchAll(pattern)];
+
+      const keys: string[] = [];
+      matches.forEach((match) => {
+        const key = match[1];
+        if (key) {
+          keys.push(key);
+        }
+      });
+
+      return keys;
+    }
+
+    return [];
+  };
+
   /* 
   This method gets file and gives it to getKeys method
   If file is visible it gets document from there to get unsaved changes
@@ -142,13 +180,24 @@ export function activate(context: vscode.ExtensionContext) {
     const editor = vscode.window.visibleTextEditors.find((editor) =>
       editor.document.uri.path.includes(path)
     );
+    const fullPath = usePathRelativeToWorkspace ? workspacePath + path : path;
     if (editor) {
       rawData = editor.document.getText();
     } else {
-      rawData = fs.readFileSync(workspacePath + path);
+      const rawDataBuffer: Buffer = fs.readFileSync(fullPath);
+      rawData = rawDataBuffer.toString();
     }
-    const refObject: Object = JSON.parse(rawData);
-    return getKeys(refObject);
+
+    if (fileType == "json") {
+      const refObject: Object = JSON.parse(rawData);
+      return getKeys(refObject);
+    } else if (fileType == "yaml") {
+      return convertYamlDataToKeys(rawData, yamlFormat);
+    } else {
+      // Unsupported type
+      const refObject: Object = {};
+      return getKeys(refObject);
+    }
   };
 
   /* 
@@ -206,36 +255,16 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Finds each keys position and puts to ranges array
     missingKeys.forEach((fullKey) => {
-      // It split back keys to create regex
-      const tree = fullKey.split(".");
-      let regex = "";
-
-      /* 
-     It creates a regex to find key position
-     It finds the key as first capturing group of match
-     */
-      tree.forEach((key, index) => {
-        if (index + 1 == tree.length) {
-          regex += `"(${key})"`;
-        } else {
-          regex += `"${key}":[\\s\\S]*?{[\\s\\S]*?`;
+      if (fileType == "json") {
+        const range = findRangeForJsonKey(fullKey, text, editor);
+        if (range) {
+          ranges.push(range);
         }
-      });
-
-      const pattern = RegExp(regex, "g");
-      /* 
-      Finding index of capturing groups is not currently
-      implemented to js, so it uses a polyfill library
-      */
-      const match = execWithIndices(pattern, text);
-      const capturingGroupPosition = match.indices[1];
-
-      // Adding range to ranges array
-      if (match && editor) {
-        const startPos = editor.document.positionAt(capturingGroupPosition[0]);
-        const endPos = editor.document.positionAt(capturingGroupPosition[1]);
-
-        ranges.push(new vscode.Range(startPos, endPos));
+      } else if (fileType == "yaml") {
+        const range = findRangeForYamlKey(fullKey, text, editor, yamlFormat);
+        if (range) {
+          ranges.push(range);
+        }
       }
     });
 
@@ -245,6 +274,70 @@ export function activate(context: vscode.ExtensionContext) {
       settings.get("isEnabled") ? ranges : []
     );
   }
+
+  const findRangeForJsonKey = (
+    fullKey: string,
+    documentText: string,
+    editor: vscode.TextEditor
+  ) => {
+    // It split back keys to create regex
+    const tree = fullKey.split(".");
+    let regex = "";
+
+    /* 
+         It creates a regex to find key position
+         It finds the key as first capturing group of match
+         */
+    tree.forEach((key, index) => {
+      if (index + 1 == tree.length) {
+        regex += `"(${key})"`;
+      } else {
+        regex += `"${key}":[\\s\\S]*?{[\\s\\S]*?`;
+      }
+    });
+
+    const pattern = RegExp(regex, "g");
+    /* 
+          Finding index of capturing groups is not currently
+          implemented to js, so it uses a polyfill library
+          */
+    const match = execWithIndices(pattern, documentText);
+    const capturingGroupPosition = match.indices[1];
+
+    // Adding range to ranges array
+    if (match && editor) {
+      const startPos = editor.document.positionAt(capturingGroupPosition[0]);
+      const endPos = editor.document.positionAt(capturingGroupPosition[1]);
+
+      return new vscode.Range(startPos, endPos);
+    }
+  };
+
+  const findRangeForYamlKey = (
+    fullKey: string,
+    documentText: string,
+    editor: vscode.TextEditor,
+    yamlFormat: YamlFormat
+  ) => {
+    if (yamlFormat == "get-values-of-special-key") {
+      let regex = `key: (${fullKey})`;
+      const pattern = RegExp(regex, "g");
+      /* 
+      Finding index of capturing groups is not currently
+      implemented to js, so it uses a polyfill library
+      */
+      const match = execWithIndices(pattern, documentText);
+      const capturingGroupPosition = match.indices[1];
+
+      // Adding range to ranges array
+      if (match && editor) {
+        const startPos = editor.document.positionAt(capturingGroupPosition[0]);
+        const endPos = editor.document.positionAt(capturingGroupPosition[1]);
+
+        return new vscode.Range(startPos, endPos);
+      }
+    }
+  };
 
   /* 
   Triggers update of decorations

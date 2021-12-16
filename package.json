@@ -34,15 +34,43 @@
           "default": true,
           "description": "Enable or disable the highlight"
         },
+        "find-missing-keys.usePathRelativeToWorkspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Uses path relative to workspace, should add / to beginning."
+        },
+        "find-missing-keys.yamlSpecialKey": {
+          "type": "string",
+          "default": "key",
+          "description": "Special key for 'get-values-of-special-key' yaml format."
+        },
+        "find-missing-keys.fileType": {
+          "type": "string",
+          "default": "json",
+          "enum": [
+            "json",
+            "yaml"
+          ]
+        },
+        "find-missing-keys.yamlFormat": {
+          "type": "string",
+          "default": "get-values-of-special-key",
+          "enum": [
+            "get-values-of-special-key"
+          ],
+          "enumDescriptions": [
+            "Gets values of a given special key as translation keys. Provide special key in settings."
+          ]
+        },
         "find-missing-keys.referenceFilePath": {
           "type": "string",
           "default": "/src/assets/i18n/en.json",
-          "description": "Reference file path"
+          "description": "Reference file path, if relative to workspace put / to beginning."
         },
         "find-missing-keys.compareFilePath": {
           "type": "string",
           "default": "/src/assets/i18n/tr.json",
-          "description": "Compare file path"
+          "description": "Compare file path, if relative to workspace put / to beginning."
         }
       }
     }
@@ -75,6 +103,7 @@
     "webpack-cli": "^4.8.0"
   },
   "dependencies": {
+    "js-yaml": "^4.1.0",
     "regexp-match-indices": "^1.0.2"
   }
 }
