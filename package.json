@@ -52,6 +52,18 @@
             "yaml"
           ]
         },
+        "find-missing-keys.compareMode": {
+          "type": "string",
+          "default": "two-files",
+          "enum": [
+            "two-files",
+            "files-with-the-same-name-in-two-folders"
+          ],
+          "enumDescriptions": [
+            "Compare two files.",
+            "Compare two folders, it matches same named files to compare."
+          ]
+        },
         "find-missing-keys.yamlFormat": {
           "type": "string",
           "default": "get-values-of-special-key",
@@ -62,15 +74,15 @@
             "Gets values of a given special key as translation keys. Provide special key in settings."
           ]
         },
-        "find-missing-keys.referenceFilePath": {
+        "find-missing-keys.referencePath": {
           "type": "string",
           "default": "/src/assets/i18n/en.json",
-          "description": "Reference file path, if relative to workspace put / to beginning."
+          "description": "Reference file or folder path, if relative to workspace put / to beginning."
         },
-        "find-missing-keys.compareFilePath": {
+        "find-missing-keys.comparePath": {
           "type": "string",
           "default": "/src/assets/i18n/tr.json",
-          "description": "Compare file path, if relative to workspace put / to beginning."
+          "description": "Compare file or folder path, if relative to workspace put / to beginning."
         }
       }
     }
@@ -103,7 +115,6 @@
     "webpack-cli": "^4.8.0"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0",
     "regexp-match-indices": "^1.0.2"
   }
 }

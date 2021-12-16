@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 const fs = require("fs");
-const yaml = require("js-yaml");
+// const yaml = require("js-yaml");
 const execWithIndices = require("regexp-match-indices");
 const window = vscode.window;
 const workspace = vscode.workspace;
 
 type FileType = "json" | "yaml";
 type YamlFormat = "get-values-of-special-key";
+type CompareMode = "two-files" | "files-with-the-same-name-in-two-folders";
 
 export function activate(context: vscode.ExtensionContext) {
   let timeout: any = null;
@@ -14,12 +15,13 @@ export function activate(context: vscode.ExtensionContext) {
   let missingKeys: string[] = [];
 
   // Inputs
-  let referenceFilePath = "";
-  let compareFilePath = "";
+  let referencePath = "";
+  let comparePath = "";
   let fileType: FileType = "json";
   let usePathRelativeToWorkspace = true;
   let yamlFormat: YamlFormat = "get-values-of-special-key";
   let yamlSpecialKey: string = "key";
+  let compareMode: CompareMode = "two-files";
 
   /* 
   Decoration settings
@@ -35,13 +37,14 @@ export function activate(context: vscode.ExtensionContext) {
   /* Get reference file paths */
   function init() {
     // Future config options can placed here
-    referenceFilePath = settings.get("referenceFilePath") || "";
-    compareFilePath = settings.get("compareFilePath") || "";
+    referencePath = settings.get("referencePath") || "";
+    comparePath = settings.get("comparePath") || "";
     fileType = <FileType>settings.get("fileType");
     usePathRelativeToWorkspace =
-      settings.get("usePathRelativeToWorkspace") || usePathRelativeToWorkspace;
-    yamlFormat = settings.get("yamlFormat") || yamlFormat;
-    yamlSpecialKey = settings.get("yamlSpecialKey") || yamlSpecialKey;
+      settings.get("usePathRelativeToWorkspace") ?? usePathRelativeToWorkspace;
+    yamlFormat = settings.get("yamlFormat") ?? yamlFormat;
+    yamlSpecialKey = settings.get("yamlSpecialKey") ?? yamlSpecialKey;
+    compareMode = settings.get("compareMode") ?? compareMode;
   }
 
   /* Register toggle highlight command */
@@ -204,14 +207,14 @@ export function activate(context: vscode.ExtensionContext) {
   This method get array of merged keys and just compare to find missing ones
   Saves for decoration update
   */
-  const updateKeys = () => {
+  const updateKeys = (refFilePath: string, compFilePath: string) => {
     const workspaceFolders = vscode.workspace.workspaceFolders;
 
-    if (workspaceFolders && referenceFilePath != "" && compareFilePath != "") {
+    if (workspaceFolders && refFilePath != "" && compFilePath != "") {
       let workspacePath = workspaceFolders[0].uri.path;
 
-      const refKeys = getKeysFromFile(referenceFilePath, workspacePath);
-      const compKeys = getKeysFromFile(compareFilePath, workspacePath);
+      const refKeys = getKeysFromFile(refFilePath, workspacePath);
+      const compKeys = getKeysFromFile(compFilePath, workspacePath);
 
       missingKeys = [];
       refKeys.forEach((refKey) => {
@@ -225,16 +228,16 @@ export function activate(context: vscode.ExtensionContext) {
   /* 
   This method updates decoration to highlight missing keys
   */
-  function updateDecorations() {
+  function updateDecorationsForFile(refFilePath: string, compFilePath: string) {
     // If reference or compare file not active not runs it
     if (
       !(
-        referenceFilePath != "" &&
-        activeEditor?.document?.uri.path.includes(referenceFilePath)
+        refFilePath != "" &&
+        activeEditor?.document?.uri.path.includes(refFilePath)
       ) &&
       !(
-        compareFilePath != "" &&
-        activeEditor?.document?.uri.path.includes(compareFilePath)
+        compFilePath != "" &&
+        activeEditor?.document?.uri.path.includes(compFilePath)
       )
     ) {
       return;
@@ -242,12 +245,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Gets reference editor to highlight, if it is not visible it not continue
     const editor = vscode.window.visibleTextEditors.find((editor) =>
-      editor.document.uri.path.includes(referenceFilePath)
+      editor.document.uri.path.includes(refFilePath)
     );
     if (!editor) return;
 
     // Updates keys
-    updateKeys();
+    updateKeys(refFilePath, compFilePath);
 
     // Gets reference documents text and create array to put highlighted ranges
     const text = editor.document.getText();
@@ -273,6 +276,28 @@ export function activate(context: vscode.ExtensionContext) {
       decorationType,
       settings.get("isEnabled") ? ranges : []
     );
+  }
+
+  function updateDecorations() {
+    if (compareMode == "two-files") {
+      updateDecorationsForFile(referencePath, comparePath);
+    } else if (compareMode == "files-with-the-same-name-in-two-folders") {
+      const refFolder: string[] = fs.readdirSync(referencePath);
+      const compFolder: string[] = fs.readdirSync(comparePath);
+
+      const matchingFiles: string[] = [];
+      refFolder.forEach((fileName) => {
+        if (compFolder.includes(fileName)) {
+          matchingFiles.push(fileName);
+        }
+      });
+      matchingFiles.forEach((file) => {
+        updateDecorationsForFile(
+          referencePath + "/" + file,
+          comparePath + "/" + file
+        );
+      });
+    }
   }
 
   const findRangeForJsonKey = (
